@@ -73,8 +73,7 @@
 > - **CLS**: 페이지가 갑자기 움직이는 현상 정도 (0~0.1이면 매우 우수)
 > - **TTFB**: 서버 응답의 초기속도 (ms, 낮을수록 빠름)
 > - **Total Requests/Size**: 요청 수와 전체 다운로드 크기 (적을수록 가벼움)
->   **참고:**
->   S3 정적 웹호스팅은 서버 타이밍 정보를 제공하지 않아,
->   Lighthouse 등 일부 도구에서는 TTFB(Time To First Byte)가 0ms 또는 N/A로 표시될 수 있음
->   실제 TTFB는 네트워크 환경과 AWS 리전, 사용자 위치에 따라 수십~수백 ms일 수 있음
->   정확한 TTFB 측정이 필요하다면 브라우저 개발자도구, curl, WebPageTest, Pingdom 등의 별도 네트워크 도구를 활용
+> - **참고:**
+>   - S3 정적 웹호스팅은 서버 타이밍 정보를 제공하지 않아, Lighthouse 등 일부 도구에서는 TTFB(Time To First Byte)가 0ms 또는 N/A로 표시될 수 있음
+>   - 실제 TTFB는 네트워크 환경과 AWS 리전, 사용자 위치에 따라 수십~수백 ms일 수 있음
+>   - 정확한 TTFB 측정이 필요하다면 브라우저 개발자도구, curl, WebPageTest, Pingdom 등의 별도 네트워크 도구를 활용
