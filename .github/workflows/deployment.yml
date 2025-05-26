@@ -78,7 +78,9 @@ jobs:
 
           function emoji_score() {
             SCORE=$1
-            if (( $(echo "$SCORE >= 90" | bc -l) )); then
+            if [[ $SCORE == "N/A" ]]; then
+              echo "⬜"
+            elif (( $(echo "$SCORE >= 90" | bc -l) )); then
               echo "🟩"
             elif (( $(echo "$SCORE >= 50" | bc -l) )); then
               echo "🟨"
@@ -87,66 +89,81 @@ jobs:
             fi
           }
 
-          echo '## 📊 S3 & CloudFront Lighthouse 리포트' > summary.md
-          echo '> 아래 표는 **최신 배포 시마다 자동으로 업데이트**됩니다.' >> summary.md
-          echo "> (업데이트: $DATE)" >> summary.md
+          # 최신 S3/CloudFront 리포트 추출
+          S3_FILE=$(ls -t .lighthouseci/*.report.json | grep 'soominss-buket' | head -1)
+          CF_FILE=$(ls -t .lighthouseci/*.report.json | grep -v 'soominss-buket' | head -1)
 
-          for f in .lighthouseci/*.report.json; do
-            NAME=$(grep -q 'soominss-buket' $f && echo "S3" || echo "CloudFront")
+          # jq 파싱 함수
+          function parse_lh() {
+            local file=$1
+            local key=$2
+            jq -r "$key" "$file" 2>/dev/null || echo "N/A"
+          }
 
-            # 카테고리별 점수
-            PERF=$(jq '.categories.performance.score * 100' $f)
-            ACC=$(jq '.categories.accessibility.score * 100' $f)
-            BP=$(jq '.categories."best-practices".score * 100' $f)
-            SEO=$(jq '.categories.seo.score * 100' $f)
-            PWA=$(jq '.categories.pwa.score * 100' $f 2>/dev/null || echo "N/A")
+          # S3 값 추출
+          S3_PERF=$(parse_lh "$S3_FILE" '.categories.performance.score * 100')
+          S3_ACC=$(parse_lh "$S3_FILE" '.categories.accessibility.score * 100')
+          S3_BP=$(parse_lh "$S3_FILE" '.categories."best-practices".score * 100')
+          S3_SEO=$(parse_lh "$S3_FILE" '.categories.seo.score * 100')
+          S3_PWA=$(parse_lh "$S3_FILE" '.categories.pwa.score * 100')
 
-            # 주요 성능 지표
-            FCP=$(jq '.audits."first-contentful-paint".numericValue' $f)
-            LCP=$(jq '.audits."largest-contentful-paint".numericValue' $f)
-            SI=$(jq '.audits."speed-index".numericValue' $f)
-            TTI=$(jq '.audits."interactive".numericValue' $f)
-            TBT=$(jq '.audits."total-blocking-time".numericValue' $f)
-            CLS=$(jq '.audits."cumulative-layout-shift".numericValue' $f)
+          S3_FCP=$(parse_lh "$S3_FILE" '.audits."first-contentful-paint".numericValue')
+          S3_LCP=$(parse_lh "$S3_FILE" '.audits."largest-contentful-paint".numericValue')
+          S3_SI=$(parse_lh "$S3_FILE" '.audits."speed-index".numericValue')
+          S3_TTI=$(parse_lh "$S3_FILE" '.audits."interactive".numericValue')
+          S3_TBT=$(parse_lh "$S3_FILE" '.audits."total-blocking-time".numericValue')
+          S3_CLS=$(parse_lh "$S3_FILE" '.audits."cumulative-layout-shift".numericValue')
+          S3_TTFB=$(parse_lh "$S3_FILE" '.audits."server-response-time".numericValue')
+          S3_REQ=$(parse_lh "$S3_FILE" '.audits."resource-summary".details.items[] | select(.resourceType=="total").requestCount')
+          S3_SIZE=$(parse_lh "$S3_FILE" '.audits."resource-summary".details.items[] | select(.resourceType=="total").transferSize')
 
-            # 초 단위 (소수점 첫째)
-            FCPS=$(awk "BEGIN {printf \"%.1f\", $FCP/1000}")
-            LCPS=$(awk "BEGIN {printf \"%.1f\", $LCP/1000}")
-            SIS=$(awk "BEGIN {printf \"%.1f\", $SI/1000}")
-            TTIS=$(awk "BEGIN {printf \"%.1f\", $TTI/1000}")
-            TBTS=$(awk "BEGIN {printf \"%.1f\", $TBT/1000}")
+          # CloudFront 값 추출
+          CF_PERF=$(parse_lh "$CF_FILE" '.categories.performance.score * 100')
+          CF_ACC=$(parse_lh "$CF_FILE" '.categories.accessibility.score * 100')
+          CF_BP=$(parse_lh "$CF_FILE" '.categories."best-practices".score * 100')
+          CF_SEO=$(parse_lh "$CF_FILE" '.categories.seo.score * 100')
+          CF_PWA=$(parse_lh "$CF_FILE" '.categories.pwa.score * 100')
 
-            # 추가 세부 측정값
-            TTFB=$(jq '.audits."server-response-time".numericValue' $f 2>/dev/null || echo "N/A")
-            REQCOUNT=$(jq '.audits."resource-summary".details.items[] | select(.resourceType=="total").requestCount' $f 2>/dev/null || echo "N/A")
-            SIZE=$(jq '.audits."resource-summary".details.items[] | select(.resourceType=="total").transferSize' $f 2>/dev/null || echo "N/A")
-            SIZEMB=$(awk "BEGIN {printf \"%.2f\", $SIZE/1024/1024}")
+          CF_FCP=$(parse_lh "$CF_FILE" '.audits."first-contentful-paint".numericValue')
+          CF_LCP=$(parse_lh "$CF_FILE" '.audits."largest-contentful-paint".numericValue')
+          CF_SI=$(parse_lh "$CF_FILE" '.audits."speed-index".numericValue')
+          CF_TTI=$(parse_lh "$CF_FILE" '.audits."interactive".numericValue')
+          CF_TBT=$(parse_lh "$CF_FILE" '.audits."total-blocking-time".numericValue')
+          CF_CLS=$(parse_lh "$CF_FILE" '.audits."cumulative-layout-shift".numericValue')
+          CF_TTFB=$(parse_lh "$CF_FILE" '.audits."server-response-time".numericValue')
+          CF_REQ=$(parse_lh "$CF_FILE" '.audits."resource-summary".details.items[] | select(.resourceType=="total").requestCount')
+          CF_SIZE=$(parse_lh "$CF_FILE" '.audits."resource-summary".details.items[] | select(.resourceType=="total").transferSize')
 
-            echo "" >> summary.md
-            echo "### ⚡️ Lighthouse report: $NAME" >> summary.md
-            echo "" >> summary.md
-            echo "| Category | Score |" >> summary.md
-            echo "| --- | --- |" >> summary.md
-            echo "| $(emoji_score $PERF) Performance | $PERF |" >> summary.md
-            echo "| $(emoji_score $ACC) Accessibility | $ACC |" >> summary.md
-            echo "| $(emoji_score $BP) Best Practices | $BP |" >> summary.md
-            echo "| $(emoji_score $SEO) SEO | $SEO |" >> summary.md
-            echo "| $(emoji_score $PWA) PWA | $PWA |" >> summary.md
+          # ms→s 변환 함수
+          function ms_to_s() {
+            awk "BEGIN {printf \"%.1f\", $1/1000}"
+          }
+          function b_to_mb() {
+            awk "BEGIN {printf \"%.2f\", $1/1024/1024}"
+          }
 
-            echo "" >> summary.md
-            echo "| Metric | Value (ms) | Value (s) |" >> summary.md
-            echo "| --- | --- | --- |" >> summary.md
-            echo "| First Contentful Paint (FCP) | $FCP | $FCPS |" >> summary.md
-            echo "| Largest Contentful Paint (LCP) | $LCP | $LCPS |" >> summary.md
-            echo "| Speed Index | $SI | $SIS |" >> summary.md
-            echo "| Time to Interactive (TTI) | $TTI | $TTIS |" >> summary.md
-            echo "| Total Blocking Time (TBT) | $TBT | $TBTS |" >> summary.md
-            echo "| Cumulative Layout Shift (CLS) | $CLS | - |" >> summary.md
-            echo "| Time to First Byte (TTFB) | $TTFB | $(awk "BEGIN {printf \"%.1f\", $TTFB/1000}") |" >> summary.md
-            echo "| Total Requests | $REQCOUNT | - |" >> summary.md
-            echo "| Total Transfer Size (bytes) | $SIZE | $SIZEMB MB |" >> summary.md
-
-          done
+          {
+            echo '## 📊 S3 vs CloudFront Lighthouse 비교'
+            echo "> 아래 표는 **최신 배포 시마다 자동으로 업데이트**됩니다."
+            echo "> (업데이트: $DATE)"
+            echo ""
+            echo "| 항목 | S3 | CloudFront |"
+            echo "|------|------------------|--------------------|"
+            echo "| Performance | $(emoji_score $S3_PERF) $S3_PERF | $(emoji_score $CF_PERF) $CF_PERF |"
+            echo "| Accessibility | $(emoji_score $S3_ACC) $S3_ACC | $(emoji_score $CF_ACC) $CF_ACC |"
+            echo "| Best Practices | $(emoji_score $S3_BP) $S3_BP | $(emoji_score $CF_BP) $CF_BP |"
+            echo "| SEO | $(emoji_score $S3_SEO) $S3_SEO | $(emoji_score $CF_SEO) $CF_SEO |"
+            echo "| PWA | $(emoji_score $S3_PWA) $S3_PWA | $(emoji_score $CF_PWA) $CF_PWA |"
+            echo "| FCP | $S3_FCP ms ($(ms_to_s $S3_FCP)s) | $CF_FCP ms ($(ms_to_s $CF_FCP)s) |"
+            echo "| LCP | $S3_LCP ms ($(ms_to_s $S3_LCP)s) | $CF_LCP ms ($(ms_to_s $CF_LCP)s) |"
+            echo "| Speed Index | $S3_SI ms ($(ms_to_s $S3_SI)s) | $CF_SI ms ($(ms_to_s $CF_SI)s) |"
+            echo "| TTI | $S3_TTI ms ($(ms_to_s $S3_TTI)s) | $CF_TTI ms ($(ms_to_s $CF_TTI)s) |"
+            echo "| TBT | $S3_TBT ms ($(ms_to_s $S3_TBT)s) | $CF_TBT ms ($(ms_to_s $CF_TBT)s) |"
+            echo "| CLS | $S3_CLS | $CF_CLS |"
+            echo "| TTFB | $S3_TTFB ms ($(ms_to_s $S3_TTFB)s) | $CF_TTFB ms ($(ms_to_s $CF_TTFB)s) |"
+            echo "| Total Requests | $S3_REQ | $CF_REQ |"
+            echo "| Total Transfer Size | $S3_SIZE bytes ($(b_to_mb $S3_SIZE)MB) | $CF_SIZE bytes ($(b_to_mb $CF_SIZE)MB) |"
+          } > summary.md
 
       - name: Update README.md with summary table
         run: |
