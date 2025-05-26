@@ -9,7 +9,7 @@
 ## 사용 기술
 
 - **Next.js**: 정적 페이지 생성 프레임워크
-- **Yarn**: 패키지 매니저 (`yarn install`, `yarn build` 사용)
+- **Yarn**: 패키지 매니저 (yarn install, yarn build 사용)
 - **GitHub Actions**: 자동화된 워크플로우 실행
 - **AWS S3**: 정적 파일 업로드 대상
 - **AWS CloudFront**: CDN을 통한 글로벌 캐싱 및 배포
@@ -19,10 +19,10 @@
 
 ## 배포 흐름
 
-1. `main` 브랜치에 코드가 푸시되거나 수동으로 워크플로우 실행
-2. [`.github/workflows/deployment.yml`](./.github/workflows/deployment.yml)에 정의된 작업 실행
-3. `yarn install`로 의존성 설치 → `yarn build`로 정적 파일 생성
-4. `out/` 디렉토리를 S3 버킷에 업로드
+1. main 브랜치에 코드가 푸시되거나 수동으로 워크플로우 실행
+2. [.github/workflows/deployment.yml](./.github/workflows/deployment.yml)에 정의된 작업 실행
+3. yarn install로 의존성 설치 → yarn build로 정적 파일 생성
+4. out/ 디렉토리를 S3 버킷에 업로드
 5. CloudFront 캐시를 무효화하여 최신 콘텐츠 반영
 
 ---
@@ -46,6 +46,4 @@
 # 심화 과제
 
 
-
-
-
+<!-- 측정표 -->
