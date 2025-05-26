@@ -170,6 +170,9 @@ jobs:
             echo "| Total Transfer Size | $S3_SIZE bytes ($(b_to_mb $S3_SIZE)MB) | $CF_SIZE bytes ($(b_to_mb $CF_SIZE)MB) |"
           } > summary.md
 
+      - name: Cleanup Lighthouse reports
+        run: rm -rf .lighthouseci
+
       - name: Update README.md with summary table
         run: |
           awk '
