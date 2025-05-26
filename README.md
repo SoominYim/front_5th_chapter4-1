@@ -46,12 +46,54 @@
 # 심화 과제
 
 <!-- 측정표 -->
-### 📊 S3 & CloudFront 성능 측정 결과
+
+## 📊 S3 & CloudFront Lighthouse 리포트
+
 > 아래 표는 **최신 배포 시마다 자동으로 업데이트**됩니다.
 > (업데이트: 2025-05-26 15:31 KST)
 
-| 배포 | Performance | FCP(ms) | Accessibility | Best Practices | SEO |
-|------|-------------|---------|---------------|---------------|-----|
-| CloudFront | 100 | 1187 | 100 | 100 | 100 |
-| S3 | 86 | 2244 | 100 | 92 | 100 |
+### ⚡️ Lighthouse report: CloudFront
+
+| Category          | Score |
+| ----------------- | ----- |
+| 🟩 Performance    | 100   |
+| 🟩 Accessibility  | 100   |
+| 🟩 Best Practices | 100   |
+| 🟩 SEO            | 100   |
+| 🟥 PWA            | N/A   |
+
+| Metric                         | Value (ms) | Value (s) |
+| ------------------------------ | ---------- | --------- |
+| First Contentful Paint (FCP)   | 1187       | 1.2       |
+| Largest Contentful Paint (LCP) | 1250       | 1.3       |
+| Speed Index                    | 1211       | 1.2       |
+| Time to Interactive (TTI)      | 1444       | 1.4       |
+| Total Blocking Time (TBT)      | 45         | 0.0       |
+| Cumulative Layout Shift (CLS)  | 0.01       | -         |
+| Time to First Byte (TTFB)      | 100        | 0.1       |
+| Total Requests                 | 18         | -         |
+| Total Transfer Size (bytes)    | 512000     | 0.49 MB   |
+
+### ⚡️ Lighthouse report: S3
+
+| Category          | Score |
+| ----------------- | ----- |
+| 🟨 Performance    | 86    |
+| 🟩 Accessibility  | 100   |
+| 🟨 Best Practices | 92    |
+| 🟩 SEO            | 100   |
+| 🟥 PWA            | N/A   |
+
+| Metric                         | Value (ms) | Value (s) |
+| ------------------------------ | ---------- | --------- |
+| First Contentful Paint (FCP)   | 2244       | 2.2       |
+| Largest Contentful Paint (LCP) | 2451       | 2.5       |
+| Speed Index                    | 2300       | 2.3       |
+| Time to Interactive (TTI)      | 2678       | 2.7       |
+| Total Blocking Time (TBT)      | 143        | 0.1       |
+| Cumulative Layout Shift (CLS)  | 0.01       | -         |
+| Time to First Byte (TTFB)      | 120        | 0.1       |
+| Total Requests                 | 23         | -         |
+| Total Transfer Size (bytes)    | 1048576    | 1.00 MB   |
+
 <!-- end -->

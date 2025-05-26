@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write # <-- 꼭 추가! github-actions[bot]가 main에 푸시 권한을 갖게 됨
+  contents: write
 
 jobs:
   deploy:
@@ -19,7 +19,6 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      # output: 'export'가 next.config.js에 설정되어 있어야 정적 빌드(out/)가 생성
       - name: Build static site
         run: yarn build
 
@@ -54,21 +53,21 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
+        run: sudo apt-get update && sudo apt-get install -y jq bc
 
       - name: Run Lighthouse on S3
         uses: treosh/lighthouse-ci-action@v10
         with:
           urls: |
             http://soominss-buket.s3-website.ap-northeast-2.amazonaws.com/
-          uploadArtifacts: false # artifact 에러 방지
+          uploadArtifacts: false
 
       - name: Run Lighthouse on CloudFront
         uses: treosh/lighthouse-ci-action@v10
         with:
           urls: |
             https://d3jxcj7xvwc1i5.cloudfront.net/
-          uploadArtifacts: false # artifact 에러 방지
+          uploadArtifacts: false
 
       - name: Generate summary table
         id: make_table
@@ -77,24 +76,78 @@ jobs:
           DATE=$(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M %Z')
           echo "DATE=$DATE" >> $GITHUB_ENV
 
-          echo '### 📊 S3 & CloudFront 성능 측정 결과' > summary.md
+          function emoji_score() {
+            SCORE=$1
+            if (( $(echo "$SCORE >= 90" | bc -l) )); then
+              echo "🟩"
+            elif (( $(echo "$SCORE >= 50" | bc -l) )); then
+              echo "🟨"
+            else
+              echo "🟥"
+            fi
+          }
+
+          echo '## 📊 S3 & CloudFront Lighthouse 리포트' > summary.md
           echo '> 아래 표는 **최신 배포 시마다 자동으로 업데이트**됩니다.' >> summary.md
           echo "> (업데이트: $DATE)" >> summary.md
-          echo "" >> summary.md
-          echo "| 배포 | Performance | FCP(ms) | Accessibility | Best Practices | SEO |" >> summary.md
-          echo "|------|-------------|---------|---------------|---------------|-----|" >> summary.md
 
           for f in .lighthouseci/*.report.json; do
             NAME=$(grep -q 'soominss-buket' $f && echo "S3" || echo "CloudFront")
+
+            # 카테고리별 점수
             PERF=$(jq '.categories.performance.score * 100' $f)
-            FCP=$(jq '.audits."first-contentful-paint".numericValue' $f | awk '{printf "%.0f", $1}')
             ACC=$(jq '.categories.accessibility.score * 100' $f)
             BP=$(jq '.categories."best-practices".score * 100' $f)
             SEO=$(jq '.categories.seo.score * 100' $f)
-            echo "| $NAME | $PERF | $FCP | $ACC | $BP | $SEO |" >> summary.md
+            PWA=$(jq '.categories.pwa.score * 100' $f 2>/dev/null || echo "N/A")
+
+            # 주요 성능 지표
+            FCP=$(jq '.audits."first-contentful-paint".numericValue' $f)
+            LCP=$(jq '.audits."largest-contentful-paint".numericValue' $f)
+            SI=$(jq '.audits."speed-index".numericValue' $f)
+            TTI=$(jq '.audits."interactive".numericValue' $f)
+            TBT=$(jq '.audits."total-blocking-time".numericValue' $f)
+            CLS=$(jq '.audits."cumulative-layout-shift".numericValue' $f)
+
+            # 초 단위 (소수점 첫째)
+            FCPS=$(awk "BEGIN {printf \"%.1f\", $FCP/1000}")
+            LCPS=$(awk "BEGIN {printf \"%.1f\", $LCP/1000}")
+            SIS=$(awk "BEGIN {printf \"%.1f\", $SI/1000}")
+            TTIS=$(awk "BEGIN {printf \"%.1f\", $TTI/1000}")
+            TBTS=$(awk "BEGIN {printf \"%.1f\", $TBT/1000}")
+
+            # 추가 세부 측정값
+            TTFB=$(jq '.audits."server-response-time".numericValue' $f 2>/dev/null || echo "N/A")
+            REQCOUNT=$(jq '.audits."resource-summary".details.items[] | select(.resourceType=="total").requestCount' $f 2>/dev/null || echo "N/A")
+            SIZE=$(jq '.audits."resource-summary".details.items[] | select(.resourceType=="total").transferSize' $f 2>/dev/null || echo "N/A")
+            SIZEMB=$(awk "BEGIN {printf \"%.2f\", $SIZE/1024/1024}")
+
+            echo "" >> summary.md
+            echo "### ⚡️ Lighthouse report: $NAME" >> summary.md
+            echo "" >> summary.md
+            echo "| Category | Score |" >> summary.md
+            echo "| --- | --- |" >> summary.md
+            echo "| $(emoji_score $PERF) Performance | $PERF |" >> summary.md
+            echo "| $(emoji_score $ACC) Accessibility | $ACC |" >> summary.md
+            echo "| $(emoji_score $BP) Best Practices | $BP |" >> summary.md
+            echo "| $(emoji_score $SEO) SEO | $SEO |" >> summary.md
+            echo "| $(emoji_score $PWA) PWA | $PWA |" >> summary.md
+
+            echo "" >> summary.md
+            echo "| Metric | Value (ms) | Value (s) |" >> summary.md
+            echo "| --- | --- | --- |" >> summary.md
+            echo "| First Contentful Paint (FCP) | $FCP | $FCPS |" >> summary.md
+            echo "| Largest Contentful Paint (LCP) | $LCP | $LCPS |" >> summary.md
+            echo "| Speed Index | $SI | $SIS |" >> summary.md
+            echo "| Time to Interactive (TTI) | $TTI | $TTIS |" >> summary.md
+            echo "| Total Blocking Time (TBT) | $TBT | $TBTS |" >> summary.md
+            echo "| Cumulative Layout Shift (CLS) | $CLS | - |" >> summary.md
+            echo "| Time to First Byte (TTFB) | $TTFB | $(awk "BEGIN {printf \"%.1f\", $TTFB/1000}") |" >> summary.md
+            echo "| Total Requests | $REQCOUNT | - |" >> summary.md
+            echo "| Total Transfer Size (bytes) | $SIZE | $SIZEMB MB |" >> summary.md
+
           done
 
-      # README.md의 <!-- 측정표 --> ~ <!-- end --> 영역을 summary.md로 자동 교체 (awk 방식)
       - name: Update README.md with summary table
         run: |
           awk '
