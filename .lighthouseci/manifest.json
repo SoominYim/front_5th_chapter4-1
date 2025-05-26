@@ -1,0 +1,15 @@
+[
+  {
+    "url": "https://d3jxcj7xvwc1i5.cloudfront.net/",
+    "isRepresentativeRun": true,
+    "htmlPath": "/home/runner/work/front_5th_chapter4-1/front_5th_chapter4-1/.lighthouseci/d3jxcj7xvwc1i5_cloudfront_net-_-2025_05_26_06_31_06.report.html",
+    "jsonPath": "/home/runner/work/front_5th_chapter4-1/front_5th_chapter4-1/.lighthouseci/d3jxcj7xvwc1i5_cloudfront_net-_-2025_05_26_06_31_06.report.json",
+    "summary": {
+      "performance": 1,
+      "accessibility": 1,
+      "best-practices": 1,
+      "seo": 1,
+      "pwa": 0.33
+    }
+  }
+]
