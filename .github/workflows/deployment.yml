@@ -6,6 +6,9 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: write # <-- 꼭 추가! github-actions[bot]가 main에 푸시 권한을 갖게 됨
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -58,14 +61,14 @@ jobs:
         with:
           urls: |
             http://soominss-buket.s3-website.ap-northeast-2.amazonaws.com/
-          uploadArtifacts: false # <- artifact 에러 방지
+          uploadArtifacts: false # artifact 에러 방지
 
       - name: Run Lighthouse on CloudFront
         uses: treosh/lighthouse-ci-action@v10
         with:
           urls: |
             https://d3jxcj7xvwc1i5.cloudfront.net/
-          uploadArtifacts: false # <- artifact 에러 방지
+          uploadArtifacts: false # artifact 에러 방지
 
       - name: Generate summary table
         id: make_table
