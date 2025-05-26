@@ -1,4 +1,4 @@
-name: Deploy Next.js to S3 and invalidate CloudFront
+name: Deploy Next.js, Invalidate CloudFront, and Update README with Lighthouse Report
 
 on:
   push:
@@ -9,7 +9,6 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -18,21 +17,79 @@ jobs:
         run: yarn install --frozen-lockfile
 
       - name: Build and export static site
-        run: yarn build
+        run: yarn build && yarn export
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4 # ✅ 최신 버전
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Deploy to S3
-        run: |
-          aws s3 sync out/ s3://${{ secrets.S3_BUCKET_NAME }} --delete
+        run: aws s3 sync out/ s3://${{ secrets.S3_BUCKET_NAME }} --delete
 
       - name: Invalidate CloudFront cache
         run: |
           aws cloudfront create-invalidation \
             --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
             --paths "/*"
+
+  lighthouse:
+    runs-on: ubuntu-latest
+    needs: deploy
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install jq & dateutils
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Run Lighthouse on S3
+        uses: treosh/lighthouse-ci-action@v10
+        with:
+          urls: |
+            http://soominss-buket.s3-website.ap-northeast-2.amazonaws.com/
+          uploadArtifacts: true
+
+      - name: Run Lighthouse on CloudFront
+        uses: treosh/lighthouse-ci-action@v10
+        with:
+          urls: |
+            https://d3jxcj7xvwc1i5.cloudfront.net/
+          uploadArtifacts: true
+
+      - name: Generate summary table
+        id: make_table
+        run: |
+          # 한국 시간으로 현재 날짜 (KST)
+          DATE=$(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M %Z')
+          echo "DATE=$DATE" >> $GITHUB_ENV
+
+          echo '### 📊 S3 & CloudFront 성능 측정 결과' > summary.md
+          echo '> 아래 표는 **최신 배포 시마다 자동으로 업데이트**됩니다.  ' >> summary.md
+          echo "> (업데이트: $DATE)" >> summary.md
+          echo "" >> summary.md
+          echo "| 배포 | Performance | FCP(ms) | Accessibility | Best Practices | SEO |" >> summary.md
+          echo "|------|-------------|---------|---------------|---------------|-----|" >> summary.md
+
+          for f in .lighthouseci/*.report.json; do
+            NAME=$(grep -q 'soominss-buket' $f && echo "S3" || echo "CloudFront")
+            PERF=$(jq '.categories.performance.score * 100' $f)
+            FCP=$(jq '.audits."first-contentful-paint".numericValue' $f | awk '{printf "%.0f", $1}')
+            ACC=$(jq '.categories.accessibility.score * 100' $f)
+            BP=$(jq '.categories."best-practices".score * 100' $f)
+            SEO=$(jq '.categories.seo.score * 100' $f)
+            echo "| $NAME | $PERF | $FCP | $ACC | $BP | $SEO |" >> summary.md
+          done
+
+      # README.md 주석 영역 치환 (<!-- ... --> ~ <!-- end -->)
+      - name: Update README.md with summary table
+        run: |
+          perl -0777 -i -pe 's/(<!-- 이 부분에[\s\S]*?<!-- end -->)/"<!-- 측정표 -->\n\n" . do { local(@ARGV, $/)=("summary.md"); <> } . "\n\n<!-- end -->"/e' README.md
+
+      - name: Commit & push if README.md changed
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "docs: update Lighthouse 성능 리포트 (README 자동 갱신)"
+          branch: main
