@@ -16,8 +16,15 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Build and export static site
+      - name: Build static site
         run: yarn build
+
+      - name: Check if out/ exists
+        run: |
+          if [ ! -d "out" ]; then
+            echo "out/ 폴더가 없습니다! next.config.js에 output: 'export' 추가 여부를 확인하세요."
+            exit 1
+          fi
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -42,7 +49,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install jq & dateutils
+      - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
 
       - name: Run Lighthouse on S3
@@ -51,6 +58,7 @@ jobs:
           urls: |
             http://soominss-buket.s3-website.ap-northeast-2.amazonaws.com/
           uploadArtifacts: true
+          artifactName: lighthouse_results_s3
 
       - name: Run Lighthouse on CloudFront
         uses: treosh/lighthouse-ci-action@v10
@@ -58,6 +66,7 @@ jobs:
           urls: |
             https://d3jxcj7xvwc1i5.cloudfront.net/
           uploadArtifacts: true
+          artifactName: lighthouse_results_cloudfront
 
       - name: Generate summary table
         id: make_table
@@ -67,7 +76,7 @@ jobs:
           echo "DATE=$DATE" >> $GITHUB_ENV
 
           echo '### 📊 S3 & CloudFront 성능 측정 결과' > summary.md
-          echo '> 아래 표는 **최신 배포 시마다 자동으로 업데이트**됩니다.  ' >> summary.md
+          echo '> 아래 표는 **최신 배포 시마다 자동으로 업데이트**됩니다.' >> summary.md
           echo "> (업데이트: $DATE)" >> summary.md
           echo "" >> summary.md
           echo "| 배포 | Performance | FCP(ms) | Accessibility | Best Practices | SEO |" >> summary.md
@@ -83,10 +92,10 @@ jobs:
             echo "| $NAME | $PERF | $FCP | $ACC | $BP | $SEO |" >> summary.md
           done
 
-      # README.md 주석 영역 치환 (<!-- ... --> ~ <!-- end -->)
+      # README.md 주석 영역 치환 (<!-- 측정표 --> ~ <!-- end -->)
       - name: Update README.md with summary table
         run: |
-          perl -0777 -i -pe 's/(<!-- 이 부분에[\s\S]*?<!-- end -->)/"<!-- 측정표 -->\n\n" . do { local(@ARGV, $/)=("summary.md"); <> } . "\n\n<!-- end -->"/e' README.md
+          perl -0777 -i -pe 's/(<!-- 측정표 -->[\s\S]*?<!-- end -->)/"<!-- 측정표 -->\n\n" . do { local(@ARGV, $/)=("summary.md"); <> } . "\n\n<!-- end -->"/e' README.md
 
       - name: Commit & push if README.md changed
         uses: stefanzweifel/git-auto-commit-action@v5
