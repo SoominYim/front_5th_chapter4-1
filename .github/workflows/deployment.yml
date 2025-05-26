@@ -58,16 +58,14 @@ jobs:
         with:
           urls: |
             http://soominss-buket.s3-website.ap-northeast-2.amazonaws.com/
-          uploadArtifacts: true
-          artifactName: lh_s3 # 더 짧고 안전한 이름
+          uploadArtifacts: false
 
       - name: Run Lighthouse on CloudFront
         uses: treosh/lighthouse-ci-action@v10
         with:
           urls: |
             https://d3jxcj7xvwc1i5.cloudfront.net/
-          uploadArtifacts: true
-          artifactName: lh_cf # 더 짧고 안전한 이름
+          uploadArtifacts: false
 
       - name: Generate summary table
         id: make_table
