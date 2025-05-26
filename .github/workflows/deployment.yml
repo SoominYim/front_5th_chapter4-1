@@ -95,8 +95,8 @@ jobs:
           }
 
           # 최신 S3/CloudFront 리포트 추출
-          S3_FILE=$(ls -t .lighthouseci/*.report.json | grep 'soominss-buket' | head -1)
-          CF_FILE=$(ls -t .lighthouseci/*.report.json | grep -v 'soominss-buket' | head -1)
+          S3_FILE=$(ls -t .lighthouseci/*.report.json | grep 'soominss_buket_s3_website' | head -1)
+          CF_FILE=$(ls -t .lighthouseci/*.report.json | grep 'cloudfront_net' | head -1)
 
           # jq 파싱 함수
           function parse_lh() {
