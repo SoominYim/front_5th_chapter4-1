@@ -16,7 +16,7 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      # output: 'export'가 next.config.js에 설정되어 있어야 정적 빌드(out/)가 생성됩니다.
+      # output: 'export'가 next.config.js에 설정되어 있어야 정적 빌드(out/)가 생성
       - name: Build static site
         run: yarn build
 
@@ -58,14 +58,14 @@ jobs:
         with:
           urls: |
             http://soominss-buket.s3-website.ap-northeast-2.amazonaws.com/
-          uploadArtifacts: false
+          uploadArtifacts: false # <- artifact 에러 방지
 
       - name: Run Lighthouse on CloudFront
         uses: treosh/lighthouse-ci-action@v10
         with:
           urls: |
             https://d3jxcj7xvwc1i5.cloudfront.net/
-          uploadArtifacts: false
+          uploadArtifacts: false # <- artifact 에러 방지
 
       - name: Generate summary table
         id: make_table
@@ -91,10 +91,15 @@ jobs:
             echo "| $NAME | $PERF | $FCP | $ACC | $BP | $SEO |" >> summary.md
           done
 
-      # README.md의 <!-- 측정표 --> ~ <!-- end --> 영역을 summary.md로 자동 교체
+      # README.md의 <!-- 측정표 --> ~ <!-- end --> 영역을 summary.md로 자동 교체 (awk 방식)
       - name: Update README.md with summary table
         run: |
-          perl -0777 -i -pe 's/(<!-- 측정표 -->[\s\S]*?<!-- end -->)/"<!-- 측정표 -->\n\n" . do { local(@ARGV, $/)=("summary.md"); <> } . "\n\n<!-- end -->"/e' README.md
+          awk '
+          BEGIN {inblock=0}
+          /<!-- 측정표 -->/ {print; while ((getline line < "summary.md") > 0) print line; inblock=1; next}
+          /<!-- end -->/ && inblock {print; inblock=0; next}
+          !inblock {print}
+          ' README.md > README.tmp && mv README.tmp README.md
 
       - name: Commit & push if README.md changed
         uses: stefanzweifel/git-auto-commit-action@v5
