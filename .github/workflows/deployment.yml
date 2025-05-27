@@ -163,7 +163,7 @@ jobs:
             local a=$1; local b=$2
             if [[ $a == "N/A" || $b == "N/A" ]]; then echo "-"; return; fi
             if (( $(awk "BEGIN {print ($a == $b)}") )); then echo "동일"; return; fi
-            local pct=$(awk "BEGIN { if ($a>0) printf \"%.1f\", (100*($b-$a)/$a); else print \"-\" }")
+            local pct=$(awk "BEGIN { if ($a>0) printf \"%.1f\", (100*($b-$a)/$a); else print \"+\" }")
             if (( $(awk "BEGIN {print ($a > $b)}") )); then
               echo "CF 빠름 (${pct}%)"
             else
