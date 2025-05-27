@@ -33,6 +33,166 @@
 
 ---
 
+## GitHub Actions 배포 및 성능 자동화 워크플로우
+
+### 1. 워크플로우 트리거 설정
+
+```yaml
+on:
+  push:
+    branches:
+      - main                  # main 브랜치에 push될 때 자동 실행
+  workflow_dispatch:          # GitHub Actions에서 수동 실행도 지원
+```
+- main 브랜치에 push될 때 자동 실행  
+- GitHub Actions에서 수동 실행도 지원
+
+<br/>
+
+### 2. 워크플로우 권한 설정
+
+```yaml
+permissions:
+  contents: write             # README 등 파일을 자동으로 수정/커밋할 수 있게 write 권한 부여
+```
+- README 등 파일을 자동으로 수정/커밋할 수 있게 write 권한 부여
+
+<br/>
+
+### 3. 정적 사이트 배포
+
+```yaml
+jobs:
+  deploy:
+    runs-on: ubuntu-latest                         # 최신 Ubuntu 환경에서 실행
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4                  # 저장소 코드 체크아웃
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile         # lockfile 기준 의존성 설치
+
+      - name: Build static site
+        run: yarn build                            # Next.js 프로젝트 정적 빌드
+
+      - name: Check if out/ exists
+        run: |                                    # 빌드 결과(out/) 존재 확인
+          if [ ! -d "out" ]; then
+            echo "❌ out/ 폴더가 없습니다! next.config.js에 output: 'export' 추가 여부를 확인하세요."
+            exit 1
+          fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4   # AWS 인증 정보 세팅(GitHub Secrets 사용)
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Deploy to S3
+        run: aws s3 sync out/ s3://${{ secrets.S3_BUCKET_NAME }} --delete   # S3 버킷 업로드, 삭제 파일도 동기화
+
+      - name: Invalidate CloudFront cache
+        run: |                                                           # CloudFront 캐시 전체 무효화
+          aws cloudfront create-invalidation
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
+```
+- 최신 Ubuntu 환경에서 실행  
+- 저장소 코드 체크아웃  
+- 의존성 설치 (lockfile 기준, 재현성 보장)  
+- Next.js 프로젝트 정적 빌드 및 빌드 결과 확인  
+- AWS 인증 정보 세팅(GitHub Secrets 사용)  
+- S3 버킷으로 빌드 결과물 업로드, 삭제 파일도 동기화  
+- CloudFront 캐시 전체 무효화로 새 배포 즉시 반영
+
+<br/>
+
+## 4. Lighthouse 성능 측정 및 README 자동 갱신
+
+```yaml
+  lighthouse:
+    runs-on: ubuntu-latest                   # 최신 Ubuntu 환경에서 실행
+    needs: deploy                            # deploy job이 끝난 후 실행
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4            # 저장소 코드 체크아웃
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq bc    # 리포트 파싱 도구 설치
+
+      - name: Run Lighthouse on S3
+        uses: treosh/lighthouse-ci-action@v10
+        with:
+          urls: |
+            http://soominss-buket.s3-website.ap-northeast-2.amazonaws.com/
+          uploadArtifacts: false             # S3 배포 주소 Lighthouse 측정
+
+      - name: Run Lighthouse on CloudFront
+        uses: treosh/lighthouse-ci-action@v10
+        with:
+          urls: |
+            https://d3jxcj7xvwc1i5.cloudfront.net/
+          uploadArtifacts: false             # CloudFront 주소 Lighthouse 측정
+
+      - name: List Lighthouse result files
+        run: |                              # 리포트 파일 확인
+          echo "==== .lighthouseci/*.report.json ===="
+          ls -l .lighthouseci/*.report.json || echo "No report files found"
+
+      - name: Generate summary table
+        id: make_table
+        run: |                              # 주요 성능 지표 추출 및 summary.md 생성
+          # (파싱 및 테이블 생성 스크립트 예시)
+          # 한국 시간으로 현재 날짜 (KST)
+          DATE=$(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M %Z')
+          echo "DATE=$DATE" >> $GITHUB_ENV
+
+          function emoji_score() {
+            SCORE=$1
+            if [[ $SCORE == "N/A" ]]; then
+              echo "⬜"
+            elif (( $(echo "$SCORE >= 90" | bc -l) )); then
+              echo "🟩"
+            elif (( $(echo "$SCORE >= 50" | bc -l) )); then
+              echo "🟨"
+            else
+              echo "🟥"
+            fi
+          }
+
+          # 최신 S3/CloudFront 리포트 추출 및 값 파싱...
+          # (실제 파싱/테이블 스크립트 내용 생략)
+          
+      - name: Cleanup Lighthouse reports
+        run: rm -rf .lighthouseci            # 임시 리포트 파일 정리
+
+      - name: Update README.md with summary table
+        run: |                              # README.md의 측정표 영역 summary.md로 대체
+          awk '
+          BEGIN {inblock=0}
+          /<!-- 측정표 -->/ {print; while ((getline line < "summary.md") > 0) print line; inblock=1; next}
+          /<!-- end -->/ && inblock {print; inblock=0; next}
+          !inblock {print}
+          ' README.md > README.tmp && mv README.tmp README.md
+
+      - name: Commit & push if README.md changed
+        uses: stefanzweifel/git-auto-commit-action@v5   # README.md가 바뀌면 자동 커밋/푸시
+        with:
+          commit_message: "docs: update Lighthouse 성능 리포트 (README 자동 갱신)"
+          branch: main
+```
+- deploy job이 끝난 후 실행  
+- 저장소 코드 체크아웃 및 리포트 파싱 도구(jq, bc) 설치  
+- S3/CloudFront 각각 Lighthouse 측정 및 결과 리포트 생성  
+- 주요 성능 지표 추출 후 summary.md 자동 생성  
+- 임시 리포트 파일 정리  
+- README.md의 측정표 영역 summary.md로 대체  
+- README.md가 바뀌면 자동 커밋/푸시
+
+
+---
+
 ## 정리
 
 - GitHub Actions로 자동 배포 파이프라인 구축
