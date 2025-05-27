@@ -171,27 +171,8 @@ jobs:
         run: |                              # README.md의 측정표 영역 summary.md로 대체
           awk '
           BEGIN {inblock=0}
-## 📊 S3 vs CloudFront Lighthouse 비교
-> 아래 표는 **최신 배포 시마다 자동으로 업데이트**됩니다.
-> (업데이트: 2025-05-27 13:58 KST)
-
-| 항목 | S3 | CloudFront |
-|------|------------------|--------------------|
-| Performance | 🟨 88 | 🟩 100 |
-| Accessibility | 🟩 100 | 🟩 100 |
-| Best Practices | 🟩 92 | 🟩 100 |
-| SEO | 🟩 100 | 🟩 100 |
-| PWA | 🟥 33 | 🟥 33 |
-| FCP | 2246.3112950000004 ms (2.2s) | 1178.415 ms (1.2s) |
-| LCP | 3004.8018500000003 ms (3.0s) | 1178.415 ms (1.2s) |
-| Speed Index | 4746.546319999994 ms (4.7s) | 2090.6406239999724 ms (2.1s) |
-| TTI | 7070.764069999999 ms (7.1s) | 2077.415 ms (2.1s) |
-| TBT | 126.5 ms (0.1s) | 25 ms (0.0s) |
-| CLS | 0.03219778382211097 | 0.04571302421445905 |
-| TTFB | 0 ms (0.0s) | 403.40000000000003 ms (0.4s) |
-| Total Requests | 19 | 17 |
-| Total Transfer Size | 397525 bytes (0.38MB) | 164293 bytes (0.16MB) |
-       / && inblock {print; inblock=0; next}
+          {print; while ((getline line < "summary.md") > 0) print line; inblock=1; next}
+          && inblock {print; inblock=0; next}
           !inblock {print}
           ' README.md > README.tmp && mv README.tmp README.md
 
