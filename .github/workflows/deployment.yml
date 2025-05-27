@@ -151,7 +151,6 @@ jobs:
             local a=$1; local b=$2
             if [[ $a == "N/A" || $b == "N/A" ]]; then echo "-"; return; fi
             if (( $(awk "BEGIN {print ($a == $b)}") )); then echo "동일"; return; fi
-            local diff=$(awk "BEGIN { printf \"%.1f\", $a - $b }")
             local pct=$(awk "BEGIN { if ($b>0) printf \"%.1f\", (100*($a-$b)/$b); else print \"-\" }")
             if (( $(awk "BEGIN {print ($a > $b)}") )); then
               echo "S3 +${pct#-}%"
@@ -176,23 +175,24 @@ jobs:
             local a=$1; local b=$2
             if [[ $a == "N/A" || $b == "N/A" ]]; then echo "-"; return; fi
             if (( $(awk "BEGIN {print ($a == $b)}") )); then echo "동일"; return; fi
-            if (( $(awk "BEGIN {print ($a > $b)}") )); then
-              echo "CF 안정적"
-            else
+            if (( $(awk "BEGIN {print ($a < $b)}") )); then
               echo "S3 안정적"
+            else
+              echo "CF 안정적"
             fi
           }
           
-          function compare_int() {
-            local a=$1; local b=$2
+          function compare_total() {
+            local a=$1; local b=$2; local type=$3
             if [[ $a == "N/A" || $b == "N/A" ]]; then echo "-"; return; fi
             if (( $a == $b )); then echo "동일"; return; fi
-            if (( $a > $b )); then
-              echo "S3 높음"
+            if (( $a < $b )); then
+              echo "S3 최적"
             else
-              echo "CF 높음"
+              echo "CF 최적"
             fi
           }
+
           
           {
             echo '## 📊 S3 vs CloudFront Lighthouse 비교'
@@ -212,9 +212,9 @@ jobs:
             echo "| TTI | $S3_TTI ms ($(ms_to_s $S3_TTI)s) | $CF_TTI ms ($(ms_to_s $CF_TTI)s) | $(compare_ms $S3_TTI $CF_TTI) |"
             echo "| TBT | $S3_TBT ms ($(ms_to_s $S3_TBT)s) | $CF_TBT ms ($(ms_to_s $CF_TBT)s) | $(compare_ms $S3_TBT $CF_TBT) |"
             echo "| CLS | $S3_CLS | $CF_CLS | $(compare_cls $S3_CLS $CF_CLS) |"
-            echo "| TTFB | $S3_TTFB ms ($(ms_to_s $S3_TTFB)s) | $CF_TTFB ms ($(ms_to_s $CF_TTFB)s) | $(compare_ms $S3_TTFB $CF_TTFB) |"
-            echo "| Total Requests | $S3_REQ | $CF_REQ | $(compare_int $S3_REQ $CF_REQ) |"
-            echo "| Total Transfer Size | $S3_SIZE bytes ($(b_to_mb $S3_SIZE)MB) | $CF_SIZE bytes ($(b_to_mb $CF_SIZE)MB) | $(compare_int $S3_SIZE $CF_SIZE) |"
+            # echo "| TTFB | $S3_TTFB ms ($(ms_to_s $S3_TTFB)s) | $CF_TTFB ms ($(ms_to_s $CF_TTFB)s) | $(compare_ms $S3_TTFB $CF_TTFB) |" # TTFB는 제외!
+            echo "| Total Requests | $S3_REQ | $CF_REQ | $(compare_total $S3_REQ $CF_REQ 'requests') |"
+            echo "| Total Transfer Size | $S3_SIZE bytes ($(b_to_mb $S3_SIZE)MB) | $CF_SIZE bytes ($(b_to_mb $CF_SIZE)MB) | $(compare_total $S3_SIZE $CF_SIZE 'size') |"
           } > summary.md
 
 
