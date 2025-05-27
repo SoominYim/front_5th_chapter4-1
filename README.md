@@ -171,7 +171,6 @@ jobs:
         run: |                              # README.md의 측정표 영역 summary.md로 대체
           awk '
           BEGIN {inblock=0}
-          /<!-- 측정표 -->/ {print; while ((getline line < "summary.md") > 0) print line; inblock=1; next}
 ## 📊 S3 vs CloudFront Lighthouse 비교
 > 아래 표는 **최신 배포 시마다 자동으로 업데이트**됩니다.
 > (업데이트: 2025-05-27 13:58 KST)
@@ -192,7 +191,7 @@ jobs:
 | TTFB | 0 ms (0.0s) | 403.40000000000003 ms (0.4s) |
 | Total Requests | 19 | 17 |
 | Total Transfer Size | 397525 bytes (0.38MB) | 164293 bytes (0.16MB) |
-          /<!-- end -->/ && inblock {print; inblock=0; next}
+       / && inblock {print; inblock=0; next}
           !inblock {print}
           ' README.md > README.tmp && mv README.tmp README.md
 
