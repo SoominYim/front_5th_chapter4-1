@@ -6,7 +6,7 @@
 
 # 기본 과제
 
-## 사용 기술
+## 사용 기술 
 
 - **Next.js**: 정적 페이지 생성 프레임워크
 - **Yarn**: 패키지 매니저 (yarn install, yarn build 사용)
